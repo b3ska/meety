@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getMeeting, updateMeeting, deleteMeeting } from "@/lib/store";
-import { computeParticipation } from "@/lib/metrics";
+import { computeParticipation, resolveName } from "@/lib/metrics";
 import { buildSnapshots, syncMemories } from "@/lib/pipeline";
 import { forgetMemory, forgetMemoriesByEntity } from "@/lib/muninn";
 import type { Meeting, MeetingType, SpeakerMap, Task } from "@/lib/types";
@@ -63,14 +63,35 @@ export async function PATCH(
         excluded,
       );
       patch.participation = participation;
-      patch.snapshots = buildSnapshots(
-        participation,
-        body.tasks ?? existing.tasks,
-      );
+
+      let tasks = body.tasks ?? existing.tasks;
+
+      // Renaming a label changes the speaker's resolved name, but task.assignee
+      // stores a name (not a label). Migrate assignees old-name → new-name so
+      // tasks follow the rename instead of orphaning under the old label.
+      if (body.speakerMap) {
+        const labels = new Set<string>();
+        for (const u of existing.utterances) labels.add(u.speaker);
+        const renameMap = new Map<string, string>();
+        for (const label of labels) {
+          const oldName = resolveName(label, existing.speakerMap);
+          const newName = resolveName(label, speakerMap);
+          if (oldName !== newName) renameMap.set(oldName, newName);
+        }
+        if (renameMap.size > 0) {
+          tasks = tasks.map((t) => {
+            const mapped = renameMap.get(t.assignee);
+            return mapped ? { ...t, assignee: mapped } : t;
+          });
+          patch.tasks = tasks;
+        }
+      }
+
+      patch.snapshots = buildSnapshots(participation, tasks);
     }
 
-    // Editing tasks: persist + re-group snapshots.
-    if (body.tasks) {
+    // Editing tasks only (no speaker change): persist + re-group snapshots.
+    if (body.tasks && !body.speakerMap) {
       patch.tasks = body.tasks;
       const participation = patch.participation ?? existing.participation;
       patch.snapshots = buildSnapshots(participation, body.tasks);
