@@ -12,7 +12,9 @@ interface Props {
   participation: Participation[];
   labels: string[];
   speakerMap: SpeakerMap;
+  excludedSpeakers: string[];
   onChangeName: (label: string, value: string) => void;
+  onToggleExclude: (label: string) => void;
   onSave: () => void;
   saving: boolean;
   saved: boolean;
@@ -25,7 +27,9 @@ export default function TalkTimePanel({
   participation,
   labels,
   speakerMap,
+  excludedSpeakers,
   onChangeName,
+  onToggleExclude,
   onSave,
   saving,
   saved,
@@ -70,31 +74,58 @@ export default function TalkTimePanel({
           style={{ borderTop: "1px solid var(--border)" }}
         >
           <p className="text-xs" style={{ color: "var(--text-3)" }}>
-            Map diarization labels to names — reflected in the chart and people board.
+            Map diarization labels to names, or mark a label as a bot / non-participant
+            to drop it from the chart and people board. Reflected on save.
           </p>
-          {labels.map((label) => (
-            <div key={label} className="flex items-center gap-2">
-              <span
-                className="shrink-0 w-9 text-xs font-mono rounded-md px-1.5 py-1 text-center"
-                style={{
-                  background: "var(--bg-surface)",
-                  color: "var(--accent)",
-                  border: "1px solid var(--border)",
-                }}
+          {labels.map((label) => {
+            const excluded = excludedSpeakers.includes(label);
+            return (
+              <div
+                key={label}
+                className="flex items-center gap-2"
+                style={excluded ? { opacity: 0.55 } : undefined}
               >
-                {label}
-              </span>
-              <input
-                type="text"
-                aria-label={`Name for speaker ${label}`}
-                value={speakerMap[label] ?? ""}
-                placeholder={`Speaker ${label}`}
-                onChange={(e) => onChangeName(label, e.target.value)}
-                className="input flex-1"
-                style={{ padding: "0.35rem 0.6rem", fontSize: "0.8rem" }}
-              />
-            </div>
-          ))}
+                <span
+                  className="shrink-0 w-9 text-xs font-mono rounded-md px-1.5 py-1 text-center"
+                  style={{
+                    background: "var(--bg-surface)",
+                    color: "var(--accent)",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  {label}
+                </span>
+                <input
+                  type="text"
+                  aria-label={`Name for speaker ${label}`}
+                  value={speakerMap[label] ?? ""}
+                  placeholder={excluded ? "Bot / excluded" : `Speaker ${label}`}
+                  disabled={excluded}
+                  onChange={(e) => onChangeName(label, e.target.value)}
+                  className="input flex-1"
+                  style={{ padding: "0.35rem 0.6rem", fontSize: "0.8rem" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => onToggleExclude(label)}
+                  aria-pressed={excluded}
+                  title={excluded ? "Include as participant" : "Mark as bot / non-participant"}
+                  className="shrink-0 flex items-center justify-center rounded-md transition-colors"
+                  style={{
+                    width: 30,
+                    height: 30,
+                    border: "1px solid var(--border)",
+                    background: excluded ? "var(--accent-container)" : "var(--bg-surface)",
+                    color: excluded ? "var(--accent)" : "var(--text-3)",
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                    {excluded ? "smart_toy" : "person_off"}
+                  </span>
+                </button>
+              </div>
+            );
+          })}
           <div className="flex items-center gap-2 pt-1">
             <button
               onClick={onSave}

@@ -50,6 +50,7 @@ export default function MeetingDetail() {
   // ── Speaker map draft (B2 fix) ─────────────────────────────────────────────
   // Initialised once from the first "ready" meeting; never overwritten by polls.
   const [speakerMap, setSpeakerMap] = useState<SpeakerMap>({});
+  const [excludedSpeakers, setExcludedSpeakers] = useState<string[]>([]);
   const speakerMapInitialisedRef = useRef(false);
 
   useEffect(() => {
@@ -60,8 +61,15 @@ export default function MeetingDetail() {
     ) {
       speakerMapInitialisedRef.current = true;
       setSpeakerMap(meeting.speakerMap ?? {});
+      setExcludedSpeakers(meeting.excludedSpeakers ?? []);
     }
   }, [meeting]);
+
+  function toggleExcluded(label: string) {
+    setExcludedSpeakers((prev) =>
+      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label],
+    );
+  }
 
   // ── Speaker-map save state ─────────────────────────────────────────────────
   const [savingMap, setSavingMap] = useState(false);
@@ -98,7 +106,11 @@ export default function MeetingDetail() {
 
   // ── PATCH helper ──────────────────────────────────────────────────────────
   const handlePatch = useCallback(
-    async (body: { speakerMap?: SpeakerMap; tasks?: Task[] }) => {
+    async (body: {
+      speakerMap?: SpeakerMap;
+      tasks?: Task[];
+      excludedSpeakers?: string[];
+    }) => {
       const res = await fetch(`/api/meetings/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -115,7 +127,7 @@ export default function MeetingDetail() {
     setSavingMap(true);
     setMapSaveError(null);
     try {
-      const updated = await handlePatch({ speakerMap });
+      const updated = await handlePatch({ speakerMap, excludedSpeakers });
       setMeeting(updated);
       setMapSaved(true);
       setTimeout(() => setMapSaved(false), 2000);
@@ -300,9 +312,11 @@ export default function MeetingDetail() {
                 participation={meeting.participation}
                 labels={diarizationLabels}
                 speakerMap={speakerMap}
+                excludedSpeakers={excludedSpeakers}
                 onChangeName={(label, value) =>
                   setSpeakerMap((prev) => ({ ...prev, [label]: value }))
                 }
+                onToggleExclude={toggleExcluded}
                 onSave={saveSpeakerMap}
                 saving={savingMap}
                 saved={mapSaved}
