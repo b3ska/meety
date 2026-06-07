@@ -65,6 +65,7 @@ export async function PATCH(
       patch.participation = participation;
 
       let tasks = body.tasks ?? existing.tasks;
+      let tasksChanged = false;
 
       // Renaming a label changes the speaker's resolved name, but task.assignee
       // stores a name (not a label). Migrate assignees old-name → new-name so
@@ -83,9 +84,13 @@ export async function PATCH(
             const mapped = renameMap.get(t.assignee);
             return mapped ? { ...t, assignee: mapped } : t;
           });
-          patch.tasks = tasks;
+          tasksChanged = true;
         }
       }
+
+      // Persist tasks if they were remapped or supplied in this request, so a
+      // combined {speakerMap, tasks} PATCH never silently drops them.
+      if (tasksChanged || body.tasks) patch.tasks = tasks;
 
       patch.snapshots = buildSnapshots(participation, tasks);
     }
